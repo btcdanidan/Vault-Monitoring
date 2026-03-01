@@ -15,7 +15,7 @@ This brings up PostgreSQL 16 + TimescaleDB, Redis 7 (256MB, allkeys-lru), FastAP
 
 - **Backend:** `GET /api/admin/health` → `{"status":"ok"}`
 - **Frontend:** `GET /` (Next.js app)
-- **Nginx:** `GET /` (proxies to frontend), `GET /api/` (proxies to FastAPI), `GET /ws/` (WebSocket to FastAPI)
+- **Nginx:** `GET /` (proxies to frontend), `GET /api/` (proxies to FastAPI), `GET /ws` (WebSocket to FastAPI)
 - **Postgres:** `pg_isready` (compose healthcheck)
 - **Redis:** `redis-cli ping` (compose healthcheck)
 - **Celery:** `celery inspect ping` (compose healthcheck)
@@ -26,4 +26,27 @@ This brings up PostgreSQL 16 + TimescaleDB, Redis 7 (256MB, allkeys-lru), FastAP
 
 - Environment variables (see `.env.example`)
 - Database migrations (Alembic): run from `backend/` with `DATABASE_URL` set
-- Nginx and SSL (production)
+
+## Production SSL (Let's Encrypt)
+
+For production with HTTPS, use the prod compose override and obtain an initial certificate before starting Nginx with SSL.
+
+1. **Set domain and email** in `.env` or export:
+   ```bash
+   export DOMAIN=your-domain.com
+   export CERTBOT_EMAIL=admin@your-domain.com
+   ```
+
+2. **Obtain initial certificate** (run from `infra/`; port 80 must be free):
+   ```bash
+   ./scripts/init-ssl.sh
+   ```
+   Or: `./scripts/init-ssl.sh your-domain.com admin@your-domain.com`  
+   The script stops Nginx, runs Certbot in standalone mode, then starts Nginx with SSL.
+
+3. **Start the stack** with the prod override:
+   ```bash
+   cd infra
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+   ```
+   Nginx listens on 80 (redirect to HTTPS + ACME challenge) and 443 (SSL). The Certbot container runs renewal every 12 hours automatically.
