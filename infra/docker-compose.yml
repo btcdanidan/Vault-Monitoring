@@ -2,15 +2,15 @@ services:
   postgres:
     image: timescale/timescaledb:latest-pg16
     environment:
-      POSTGRES_USER: defi
-      POSTGRES_PASSWORD: defi
-      POSTGRES_DB: defi_vault
+      POSTGRES_USER: ${POSTGRES_USER:-defi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-defi}
+      POSTGRES_DB: ${POSTGRES_DB:-defi_vault}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U defi -d defi_vault"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -33,8 +33,10 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
     ports:
       - "8000:8000"
+    env_file:
+      - ../.env
     environment:
-      DATABASE_URL: postgresql+asyncpg://defi:defi@postgres:5432/defi_vault
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-defi}:${POSTGRES_PASSWORD:-defi}@postgres:5432/${POSTGRES_DB:-defi_vault}
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
     depends_on:
@@ -56,6 +58,8 @@ services:
     command: celery -A workers.celery_app:app worker --loglevel=info --concurrency=2
     deploy:
       replicas: 3
+    env_file:
+      - ../.env
     environment:
       REDIS_URL: redis://redis:6379/0
     depends_on:
@@ -75,6 +79,8 @@ services:
       context: ..
       dockerfile: workers/Dockerfile
     command: celery -A workers.celery_app:app beat --loglevel=info
+    env_file:
+      - ../.env
     environment:
       REDIS_URL: redis://redis:6379/0
     depends_on:
