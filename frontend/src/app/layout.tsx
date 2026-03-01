@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { QueryProvider } from "@/providers/query-provider";
+import { SupabaseProvider } from "@/providers/supabase-provider";
 
 export const metadata: Metadata = {
   title: "DeFi Vault Intelligence Platform",
@@ -13,7 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <SupabaseProvider>
+          <QueryProvider>{children}</QueryProvider>
+        </SupabaseProvider>
+      </body>
     </html>
   );
 }
