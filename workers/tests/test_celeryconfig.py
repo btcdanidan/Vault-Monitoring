@@ -147,12 +147,24 @@ class TestScheduleIntervals:
         assert isinstance(sched, crontab)
 
 
+_ENABLED_S10_TASKS: set[str] = {
+    "refresh-prices",
+}
+
+
 class TestDisablementMechanism:
     """Disabled tasks excluded from active beat_schedule; enabled ones present."""
 
-    def test_all_s10_tasks_initially_disabled(self) -> None:
+    def test_unimplemented_s10_tasks_disabled(self) -> None:
         for key in S10_TASKS:
-            assert key in _DISABLED_TASKS, f"{key} should be disabled initially"
+            if key in _ENABLED_S10_TASKS:
+                continue
+            assert key in _DISABLED_TASKS, f"{key} should be disabled"
+
+    def test_implemented_s10_tasks_enabled(self) -> None:
+        for key in _ENABLED_S10_TASKS:
+            assert key not in _DISABLED_TASKS, f"{key} should be enabled"
+            assert key in beat_schedule, f"{key} should be in beat_schedule"
 
     def test_disabled_tasks_excluded_from_beat_schedule(self) -> None:
         for key in _DISABLED_TASKS:
