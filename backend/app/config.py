@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     alchemy_api_key: str = ""
     helius_api_key: str = ""
     lifi_api_key: str = ""
+    envio_api_token: str = ""
     anthropic_api_key: str = ""
     domain: str = "localhost"
     telegram_bot_token: str = ""
