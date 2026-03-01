@@ -6,7 +6,13 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.api import admin, auth, positions, vaults, wallets, ws
-from app.exceptions import ForbiddenException, UnauthorizedException
+from app.exceptions import (
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+    UnauthorizedException,
+)
 
 
 @asynccontextmanager
@@ -35,6 +41,24 @@ def create_app() -> FastAPI:
     ) -> JSONResponse:
         content = exc.detail if isinstance(exc.detail, dict) else {"detail": exc.detail}
         return JSONResponse(status_code=exc.status_code, content=content)
+
+    @app.exception_handler(BadRequestException)
+    async def bad_request_handler(  # pyright: ignore[reportUnusedFunction]
+        request: Request, exc: BadRequestException
+    ) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+    @app.exception_handler(NotFoundException)
+    async def not_found_handler(  # pyright: ignore[reportUnusedFunction]
+        request: Request, exc: NotFoundException
+    ) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+    @app.exception_handler(ConflictException)
+    async def conflict_handler(  # pyright: ignore[reportUnusedFunction]
+        request: Request, exc: ConflictException
+    ) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
     app.include_router(wallets.router, prefix="/api/wallets", tags=["wallets"])

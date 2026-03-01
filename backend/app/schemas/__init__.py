@@ -5,9 +5,19 @@ from app.schemas.admin import (
     AccountListResponse,
     ProfileListItem,
 )
+from app.schemas.wallet import (
+    WalletCreate,
+    WalletListResponse,
+    WalletResponse,
+    WalletUpdate,
+)
 
 __all__ = [
     "AccountActionResponse",
     "AccountListResponse",
     "ProfileListItem",
+    "WalletCreate",
+    "WalletListResponse",
+    "WalletResponse",
+    "WalletUpdate",
 ]
