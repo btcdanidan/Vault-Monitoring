@@ -1,0 +1,7 @@
+# Production Nginx with envsubst for DOMAIN substitution and SSL.
+FROM nginx:alpine
+RUN apk add --no-cache gettext
+COPY nginx/prod.conf /etc/nginx/templates/prod.conf
+COPY nginx/entrypoint-prod.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
