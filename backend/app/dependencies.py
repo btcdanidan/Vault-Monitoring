@@ -13,7 +13,7 @@ from app.database import get_db
 from app.exceptions import ForbiddenException, UnauthorizedException
 from app.services.auth import get_or_create_profile
 
-__all__ = ["get_db_session", "get_current_user_id"]
+__all__ = ["get_db_session", "get_current_user_id", "get_current_admin_id"]
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
@@ -80,4 +80,21 @@ async def get_current_user_id(
         )
 
     request.state.user_id = user_id
+    return user_id
+
+
+async def get_current_admin_id(
+    request: Request,
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+) -> uuid.UUID:
+    """
+    Validate JWT, resolve profile, require approved and is_admin, set RLS, return user_id.
+    Raises UnauthorizedException (401) or ForbiddenException (403) on failure.
+    """
+    user_id = await get_current_user_id(request, db)
+    profile = await get_or_create_profile(
+        db, user_id, None
+    )  # profile already exists and is approved at this point
+    if not profile.is_admin:
+        raise ForbiddenException(detail="Admin access required", reason="not_admin")
     return user_id

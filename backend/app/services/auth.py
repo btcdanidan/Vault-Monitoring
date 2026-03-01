@@ -1,5 +1,6 @@
 """Auth and profile resolution for JWT-backed requests."""
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 
@@ -7,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.profile import Profile
+from app.services import notifications as notifications_service
 
 
 async def get_or_create_profile(
@@ -32,4 +34,6 @@ async def get_or_create_profile(
     session.add(profile)
     await session.flush()
     await session.refresh(profile)
+    # Fire-and-forget: notify admin of new signup (do not block auth response)
+    asyncio.create_task(notifications_service.notify_telegram_new_signup(profile.email))
     return profile

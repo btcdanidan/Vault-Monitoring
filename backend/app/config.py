@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     monthly_budget_usd: float = 100.0
     claude_budget_usd: float = 50.0
     vps_cost_usd: float = 14.0
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
 
 
 @lru_cache
