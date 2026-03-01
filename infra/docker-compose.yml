@@ -17,6 +17,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
       - "6379:6379"
     healthcheck:
@@ -29,6 +30,7 @@ services:
     build:
       context: ..
       dockerfile: backend/Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
     ports:
       - "8000:8000"
     environment:
@@ -40,17 +42,33 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/admin/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   celery_worker:
     build:
       context: ..
       dockerfile: workers/Dockerfile
-    command: celery -A workers.celery_app:app worker --loglevel=info
+    command: celery -A workers.celery_app:app worker --loglevel=info --concurrency=2
+    deploy:
+      replicas: 3
     environment:
       REDIS_URL: redis://redis:6379/0
     depends_on:
-      - redis
-      - backend
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A workers.celery_app:app inspect ping || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   celery_beat:
     build:
@@ -72,7 +90,14 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://localhost/api
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/', r=>{r.resume();process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   nginx:
     image: nginx:alpine
@@ -81,8 +106,15 @@ services:
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 volumes:
   postgres_data: {}
