@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_admin_chat_id: str = ""
     app_secret_key: str = "change-me"
+    defillama_base_url: str = "https://coins.llama.fi"
     environment: str = "development"
     monthly_budget_usd: float = 100.0
     claude_budget_usd: float = 50.0
