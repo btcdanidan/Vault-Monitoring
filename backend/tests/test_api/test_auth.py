@@ -2,9 +2,8 @@
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
-import jwt
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -12,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.database import get_db
 from app.main import app
 from app.models.profile import Profile
+from tests.conftest import make_token
 
 # In-memory SQLite with only Profile table (avoids JSONB/Postgres-only types in other models)
 AUTH_TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -42,25 +42,6 @@ async def auth_db_session(
     async with async_session_maker() as session:
         yield session
         await session.rollback()
-
-
-def make_token(
-    user_id: uuid.UUID,
-    *,
-    secret: str = "test-jwt-secret-for-tests",
-    email: str | None = "test@example.com",
-    expired: bool = False,
-) -> str:
-    """Build a JWT with sub=user_id for tests."""
-    now = datetime.now(UTC)
-    payload = {
-        "sub": str(user_id),
-        "exp": now - timedelta(hours=1) if expired else now + timedelta(hours=1),
-        "iat": now,
-    }
-    if email is not None:
-        payload["email"] = email
-    return jwt.encode(payload, secret, algorithm="HS256")
 
 
 @pytest.fixture

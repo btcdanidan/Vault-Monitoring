@@ -2,8 +2,11 @@
 
 import asyncio
 import os
+import uuid
 from collections.abc import AsyncGenerator, Generator
+from datetime import UTC, datetime, timedelta
 
+import jwt
 import pytest
 
 # Set before any app import so get_settings() sees test secret
@@ -11,6 +14,25 @@ os.environ.setdefault("SUPABASE_JWT_SECRET", "test-jwt-secret-for-tests")
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models import Base
+
+
+def make_token(
+    user_id: uuid.UUID,
+    *,
+    secret: str = "test-jwt-secret-for-tests",
+    email: str | None = "test@example.com",
+    expired: bool = False,
+) -> str:
+    """Build a JWT with sub=user_id for tests."""
+    now = datetime.now(UTC)
+    payload = {
+        "sub": str(user_id),
+        "exp": now - timedelta(hours=1) if expired else now + timedelta(hours=1),
+        "iat": now,
+    }
+    if email is not None:
+        payload["email"] = email
+    return jwt.encode(payload, secret, algorithm="HS256")
 
 # Use in-memory SQLite for tests, or override with TEST_DATABASE_URL
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
