@@ -88,7 +88,6 @@ _FULL_BEAT_SCHEDULE: dict[str, dict] = {
 # Tasks whose implementations are still placeholders.  Remove a key here
 # when the corresponding sprint delivers a real implementation.
 _DISABLED_TASKS: set[str] = {
-    "refresh-prices",
     "refresh-health-factors",
     "refresh-vault-metrics",
     "snapshot-positions",
