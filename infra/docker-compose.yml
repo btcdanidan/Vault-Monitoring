@@ -51,24 +51,73 @@ services:
       retries: 3
       start_period: 15s
 
-  celery_worker:
+  celery_worker_critical:
     build:
       context: ..
       dockerfile: workers/Dockerfile
-    command: celery -A workers.celery_app:app worker --loglevel=info --concurrency=2
-    deploy:
-      replicas: 3
+    command: celery -A workers.celery_app:app worker --loglevel=info --concurrency=2 -Q critical -n critical@%h
     env_file:
       - ../.env
     environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-defi}:${POSTGRES_PASSWORD:-defi}@postgres:5432/${POSTGRES_DB:-defi_vault}
       REDIS_URL: redis://redis:6379/0
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "celery -A workers.celery_app:app inspect ping || exit 1"]
+      test: ["CMD-SHELL", "celery -A workers.celery_app:app inspect ping -d critical@$$HOSTNAME || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  celery_worker_default1:
+    build:
+      context: ..
+      dockerfile: workers/Dockerfile
+    command: celery -A workers.celery_app:app worker --loglevel=info --concurrency=2 -Q default -n default1@%h
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-defi}:${POSTGRES_PASSWORD:-defi}@postgres:5432/${POSTGRES_DB:-defi_vault}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A workers.celery_app:app inspect ping -d default1@$$HOSTNAME || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  celery_worker_default2:
+    build:
+      context: ..
+      dockerfile: workers/Dockerfile
+    command: celery -A workers.celery_app:app worker --loglevel=info --concurrency=2 -Q default -n default2@%h
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-defi}:${POSTGRES_PASSWORD:-defi}@postgres:5432/${POSTGRES_DB:-defi_vault}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A workers.celery_app:app inspect ping -d default2@$$HOSTNAME || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -82,10 +131,15 @@ services:
     env_file:
       - ../.env
     environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-defi}:${POSTGRES_PASSWORD:-defi}@postgres:5432/${POSTGRES_DB:-defi_vault}
       REDIS_URL: redis://redis:6379/0
     depends_on:
-      - redis
-      - backend
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
 
   frontend:
     build:
