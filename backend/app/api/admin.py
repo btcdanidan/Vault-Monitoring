@@ -9,9 +9,11 @@ from app.database import get_db
 from app.dependencies import get_current_admin_id
 from app.schemas.admin import (
     AccountActionResponse,
+    AccountDeletionResponse,
     AccountListResponse,
     ProfileListItem,
 )
+from app.services import account_deletion as account_deletion_service
 from app.services import admin as admin_service
 from app.services import notifications as notifications_service
 
@@ -75,3 +77,27 @@ async def reject_account(
         raise
     await notifications_service.send_rejection_email(profile.email)
     return AccountActionResponse.model_validate(profile)
+
+
+@router.delete("/accounts/{user_id}", response_model=AccountDeletionResponse)
+async def delete_account(
+    user_id: uuid.UUID,
+    admin_id: uuid.UUID = Depends(get_current_admin_id),  # noqa: B008
+    db: AsyncSession = Depends(get_db),  # noqa: B008
+) -> AccountDeletionResponse:
+    """Delete a user account (cascade) and Supabase auth user. Cannot delete self or another admin."""
+    if admin_id == user_id:
+        raise HTTPException(status_code=403, detail="Cannot delete your own admin account")
+    try:
+        deleted_ok, auth_cleanup_pending = await account_deletion_service.delete_user_account(db, user_id)
+    except ValueError as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="Profile not found") from e
+        if "admin" in str(e).lower():
+            raise HTTPException(status_code=403, detail="Cannot delete an admin account") from e
+        raise
+    return AccountDeletionResponse(
+        deleted=deleted_ok,
+        user_id=user_id,
+        auth_cleanup_pending=auth_cleanup_pending,
+    )
