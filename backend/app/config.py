@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     postgres_user: str = "defi"
     postgres_password: str = "defi"
     postgres_db: str = "defi_vault"
+    celery_db_password: str = "celery_worker_password"
     supabase_url: str = ""
     supabase_anon_key: str = ""
     supabase_jwt_secret: str = ""
