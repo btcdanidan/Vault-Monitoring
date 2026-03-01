@@ -49,6 +49,8 @@ For the frontend you also need (same values, public only):
 
 **Security:** Never expose `SUPABASE_JWT_SECRET` or `SUPABASE_SERVICE_ROLE_KEY` to the frontend. Use them only in the FastAPI backend.
 
+**Protected endpoints:** Any route that requires authentication expects the header `Authorization: Bearer <access_token>`. The FastAPI backend validates the JWT locally using `SUPABASE_JWT_SECRET` (no call to Supabase Auth API). See §19.7 and the S02 JWT validation middleware.
+
 ---
 
 ## 3. Auth Provider Configuration (Dashboard)

@@ -1,9 +1,13 @@
 """Shared pytest fixtures."""
 
 import asyncio
+import os
 from collections.abc import AsyncGenerator, Generator
 
 import pytest
+
+# Set before any app import so get_settings() sees test secret
+os.environ.setdefault("SUPABASE_JWT_SECRET", "test-jwt-secret-for-tests")
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models import Base
