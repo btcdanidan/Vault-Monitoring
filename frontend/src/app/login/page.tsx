@@ -4,8 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
+import { apiFetchRaw } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,9 +33,7 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
-    const res = await fetch(`${API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await apiFetchRaw("/auth/me", { accessToken: token });
     if (res.ok) {
       router.push("/");
       router.refresh();

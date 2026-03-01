@@ -39,3 +39,17 @@ class AccountActionResponse(BaseModel):
     rejected: bool
     approved_at: datetime | None
     approved_by: uuid.UUID | None
+
+
+class AccountDeletionRequest(BaseModel):
+    """Request body for self-deletion; confirm_email must match profile email."""
+
+    confirm_email: str
+
+
+class AccountDeletionResponse(BaseModel):
+    """Response after account deletion (§19.9)."""
+
+    deleted: bool
+    user_id: uuid.UUID
+    auth_cleanup_pending: bool

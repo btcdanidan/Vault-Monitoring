@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getSessionToken, apiGet, apiPost } from "@/lib/api";
+import { getSessionToken, apiGet, apiPost, apiDelete } from "@/lib/api";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 
@@ -61,6 +61,7 @@ export default function AdminAccountsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmReject, setConfirmReject] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const fetchAccounts = useCallback(async (): Promise<AccountListResponse> => {
     const token = await getSessionToken();
@@ -116,6 +117,24 @@ export default function AdminAccountsPage() {
     [queryClient]
   );
 
+  const deleteAccount = useCallback(
+    async (userId: string) => {
+      setActionError(null);
+      setConfirmDelete(null);
+      const token = await getSessionToken();
+      if (!token) return;
+      try {
+        await apiDelete<unknown>(`/admin/accounts/${userId}`, undefined, {
+          accessToken: token,
+        });
+        await queryClient.invalidateQueries({ queryKey: ["admin", "accounts"] });
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : "Failed to delete");
+      }
+    },
+    [queryClient]
+  );
+
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto max-w-4xl">
@@ -123,7 +142,7 @@ export default function AdminAccountsPage() {
           <div>
             <h1 className="text-2xl font-bold">Account management</h1>
             <p className="mt-1 text-sm text-gray-600">
-              Approve or reject signup requests. Only admins can access this
+              Approve, reject, or delete accounts. Only admins can access this
               page.
             </p>
           </div>
@@ -228,6 +247,23 @@ export default function AdminAccountsPage() {
                               Cancel
                             </button>
                           </span>
+                        ) : confirmDelete === account.id ? (
+                          <span className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => deleteAccount(account.id)}
+                              className="font-medium text-red-600 hover:text-red-700"
+                            >
+                              Confirm delete
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDelete(null)}
+                              className="text-gray-600 hover:text-gray-800"
+                            >
+                              Cancel
+                            </button>
+                          </span>
                         ) : (
                           <span className="flex justify-end gap-2">
                             {!account.approved && !account.rejected && (
@@ -252,6 +288,15 @@ export default function AdminAccountsPage() {
                                   </button>
                                 )}
                               </>
+                            )}
+                            {!account.is_admin && (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDelete(account.id)}
+                                className="font-medium text-gray-500 hover:text-red-600"
+                              >
+                                Delete
+                              </button>
                             )}
                           </span>
                         )}
