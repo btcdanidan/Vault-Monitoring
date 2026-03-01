@@ -1,0 +1,11 @@
+# Production overrides: use built images, no hot-reload
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+services:
+  backend:
+    environment:
+      ENVIRONMENT: production
+
+  frontend:
+    environment:
+      NODE_ENV: production
