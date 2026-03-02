@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     alchemy_api_key: str = ""
     helius_api_key: str = ""
+    helius_base_url: str = "https://mainnet.helius-rpc.com"
     lifi_api_key: str = ""
     envio_api_token: str = ""
     anthropic_api_key: str = ""
