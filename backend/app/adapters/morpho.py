@@ -1,20 +1,51 @@
-"""Morpho protocol adapter."""
+"""Morpho Blue / MetaMorpho protocol adapter (§9).
 
-from app.adapters.base import ProtocolAdapter
+Live state: Morpho GraphQL API (zero RPC cost).
+Historical events: HyperSync — Deposit, Withdraw, Supply, Borrow, Repay.
+"""
+
+from __future__ import annotations
+
+from app.adapters.base import BaseProtocolAdapter
+from app.adapters.registry import register_adapter
+from app.schemas.adapter import RawEvent, RawPosition, VaultMetricsData
 
 
-class MorphoAdapter(ProtocolAdapter):
-    """Morpho Blue / MetaMorpho adapter. Stub."""
+@register_adapter
+class MorphoAdapter(BaseProtocolAdapter):
+    """Morpho Blue / MetaMorpho adapter.
+
+    Protocol logic will be implemented in a subsequent sprint; the abstract
+    methods currently return empty lists.
+    """
+
+    @property
+    def protocol_name(self) -> str:
+        return "morpho"
+
+    @property
+    def supported_chains(self) -> list[str]:
+        return ["ethereum", "base"]
 
     async def fetch_live_metrics(
-        self, vault_addresses: list[str]
-    ) -> list[dict]:
+        self,
+        vault_addresses: list[str],
+        chain: str,
+    ) -> list[VaultMetricsData]:
         return []
 
-    async def fetch_positions(self, wallet: str) -> list[dict]:
+    async def fetch_positions(
+        self,
+        wallet: str,
+        chain: str,
+    ) -> list[RawPosition]:
         return []
 
     async def fetch_historical_events(
-        self, wallet: str, from_block: int, to_block: int
-    ) -> list[dict]:
+        self,
+        wallet: str,
+        chain: str,
+        from_block: int,
+        to_block: int,
+    ) -> list[RawEvent]:
         return []
