@@ -15,10 +15,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+import os
+
 import httpx
 import structlog
-
-from app.config import get_settings
 
 logger = structlog.get_logger(__name__)
 
@@ -123,15 +123,16 @@ class SignaturesResult:
 
 
 def get_helius_rpc_url() -> str:
-    """Build Helius RPC URL with API key from settings.
+    """Build Helius RPC URL with API key from environment.
 
     Raises:
-        ValueError: If ``helius_api_key`` is not configured.
+        ValueError: If ``HELIUS_API_KEY`` is not configured.
     """
-    settings = get_settings()
-    if not settings.helius_api_key:
+    api_key = os.getenv("HELIUS_API_KEY", "")
+    if not api_key:
         raise ValueError("HELIUS_API_KEY is not configured")
-    return f"{settings.helius_base_url}/?api-key={settings.helius_api_key}"
+    base_url = os.getenv("HELIUS_BASE_URL", "https://mainnet.helius-rpc.com")
+    return f"{base_url}/?api-key={api_key}"
 
 
 # ---------------------------------------------------------------------------
