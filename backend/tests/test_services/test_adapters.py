@@ -147,9 +147,7 @@ class TestRetryWithBackoff:
 
     async def test_retries_on_http_error(self) -> None:
         adapter = _TestAdapter()
-        fn = AsyncMock(
-            side_effect=[httpx.ConnectError("fail"), httpx.ConnectError("fail"), "ok"]
-        )
+        fn = AsyncMock(side_effect=[httpx.ConnectError("fail"), httpx.ConnectError("fail"), "ok"])
         with patch("app.adapters.base.asyncio.sleep", new_callable=AsyncMock):
             result = await adapter._retry_with_backoff(fn, base_delay=0.01)
         assert result == "ok"
@@ -414,17 +412,13 @@ class TestFetchAndStoreMetrics:
         mock_db = AsyncMock()
         mock_redis = MagicMock()
 
-        result = await adapter.fetch_and_store_metrics(
-            mock_db, mock_redis, ["0xabc"], "ethereum"
-        )
+        result = await adapter.fetch_and_store_metrics(mock_db, mock_redis, ["0xabc"], "ethereum")
 
         assert result == metrics
         adapter.fetch_live_metrics.assert_awaited_once_with(["0xabc"], "ethereum")
         adapter.write_vault_metrics.assert_awaited_once_with(mock_db, metrics)
         adapter.discover_vaults.assert_awaited_once()
-        adapter._track_rate_limit.assert_awaited_once_with(
-            mock_redis, "fetch_live_metrics"
-        )
+        adapter._track_rate_limit.assert_awaited_once_with(mock_redis, "fetch_live_metrics")
 
 
 # ---------------------------------------------------------------------------
@@ -510,9 +504,7 @@ class TestAdapterRegistry:
             ) -> list[VaultMetricsData]:
                 return []
 
-            async def fetch_positions(
-                self, wallet: str, chain: str
-            ) -> list[RawPosition]:
+            async def fetch_positions(self, wallet: str, chain: str) -> list[RawPosition]:
                 return []
 
             async def fetch_historical_events(
@@ -535,7 +527,7 @@ class TestAdapterRegistry:
 
 
 class TestMorphoAdapter:
-    """Verify Morpho adapter properties and stub behaviour."""
+    """Verify Morpho adapter properties."""
 
     def test_protocol_name(self) -> None:
         from app.adapters.morpho import MorphoAdapter
@@ -549,26 +541,678 @@ class TestMorphoAdapter:
         adapter = MorphoAdapter()
         assert adapter.supported_chains == ["ethereum", "base"]
 
-    async def test_fetch_live_metrics_returns_empty(self) -> None:
+    def test_chain_id_mapping(self) -> None:
+        from app.adapters.morpho import CHAIN_ID_MAP
+
+        assert CHAIN_ID_MAP["ethereum"] == 1
+        assert CHAIN_ID_MAP["base"] == 8453
+
+
+class TestMorphoGraphQLQuery:
+    """Test the internal _graphql_query helper."""
+
+    async def test_successful_query(self) -> None:
         from app.adapters.morpho import MorphoAdapter
 
         adapter = MorphoAdapter()
-        result = await adapter.fetch_live_metrics(["0x1"], "ethereum")
-        assert result == []
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "data": {"vaults": {"items": []}},
+        }
 
-    async def test_fetch_positions_returns_empty(self) -> None:
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+        mock_http.post = AsyncMock(return_value=mock_response)
+        adapter._http_client = mock_http
+        adapter._owns_http = False
+
+        result = await adapter._graphql_query(
+            "query { vaults { items { address } } }",
+        )
+        assert result == {"vaults": {"items": []}}
+        mock_http.post.assert_awaited_once()
+
+    async def test_graphql_errors_raise(self) -> None:
+        from app.adapters.morpho import MorphoAdapter, MorphoGraphQLError
+
+        adapter = MorphoAdapter()
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "errors": [{"message": "Query too complex"}],
+        }
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+        mock_http.post = AsyncMock(return_value=mock_response)
+        adapter._http_client = mock_http
+        adapter._owns_http = False
+
+        with pytest.raises(MorphoGraphQLError, match="Query too complex"):
+            await adapter._graphql_query("query { bad }")
+
+    async def test_http_error_retries(self) -> None:
         from app.adapters.morpho import MorphoAdapter
 
         adapter = MorphoAdapter()
-        result = await adapter.fetch_positions("0xwallet", "ethereum")
-        assert result == []
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+        mock_http.post = AsyncMock(
+            side_effect=httpx.ConnectError("connection refused"),
+        )
+        adapter._http_client = mock_http
+        adapter._owns_http = False
 
-    async def test_fetch_historical_events_returns_empty(self) -> None:
+        with (
+            patch(
+                "app.adapters.base.asyncio.sleep",
+                new_callable=AsyncMock,
+            ),
+            pytest.raises(httpx.ConnectError),
+        ):
+            await adapter._graphql_query("query { test }")
+
+        assert mock_http.post.await_count == 4
+
+
+class TestMorphoFetchLiveMetrics:
+    """Test fetch_live_metrics with mocked GraphQL responses."""
+
+    @staticmethod
+    def _vault_response() -> dict:
+        return {
+            "data": {
+                "vaults": {
+                    "items": [
+                        {
+                            "address": "0xAbC123",
+                            "name": "Steakhouse USDC",
+                            "symbol": "steakUSDC",
+                            "asset": {
+                                "address": "0xa0b869",
+                                "symbol": "USDC",
+                                "decimals": 6,
+                            },
+                            "chain": {"id": 1},
+                            "state": {
+                                "totalAssetsUsd": 50000000,
+                                "totalAssets": "50000000000",
+                                "fee": 0.1,
+                                "apy": 0.085,
+                                "netApy": 0.0765,
+                                "curator": "0xcurator",
+                            },
+                        },
+                        {
+                            "address": "0xDef456",
+                            "name": "Gauntlet WETH",
+                            "symbol": "gtWETH",
+                            "asset": {
+                                "address": "0xc02aaa",
+                                "symbol": "WETH",
+                                "decimals": 18,
+                            },
+                            "chain": {"id": 1},
+                            "state": {
+                                "totalAssetsUsd": 30000000,
+                                "totalAssets": "8500000000000000000000",
+                                "fee": 0.15,
+                                "apy": 0.032,
+                                "netApy": 0.0272,
+                                "curator": None,
+                            },
+                        },
+                    ],
+                },
+            },
+        }
+
+    @staticmethod
+    def _market_response() -> dict:
+        return {
+            "data": {
+                "markets": {
+                    "items": [
+                        {
+                            "uniqueKey": "0xmarket1",
+                            "loanAsset": {
+                                "address": "0xusdc",
+                                "symbol": "USDC",
+                                "decimals": 6,
+                            },
+                            "collateralAsset": {
+                                "address": "0xweth",
+                                "symbol": "WETH",
+                            },
+                            "state": {
+                                "supplyAssetsUsd": 10000000,
+                                "borrowAssetsUsd": 7000000,
+                                "supplyApy": 0.045,
+                                "borrowApy": 0.06,
+                                "fee": 0,
+                                "utilization": 0.7,
+                            },
+                        },
+                    ],
+                },
+            },
+        }
+
+    async def test_fetches_vaults_and_markets(self) -> None:
         from app.adapters.morpho import MorphoAdapter
 
         adapter = MorphoAdapter()
-        result = await adapter.fetch_historical_events("0xwallet", "ethereum", 0, 100)
+        vault_resp = MagicMock(spec=httpx.Response)
+        vault_resp.status_code = 200
+        vault_resp.raise_for_status = MagicMock()
+        vault_resp.json.return_value = self._vault_response()
+
+        market_resp = MagicMock(spec=httpx.Response)
+        market_resp.status_code = 200
+        market_resp.raise_for_status = MagicMock()
+        market_resp.json.return_value = self._market_response()
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+        mock_http.post = AsyncMock(
+            side_effect=[vault_resp, market_resp],
+        )
+        adapter._http_client = mock_http
+        adapter._owns_http = False
+
+        results = await adapter.fetch_live_metrics([], "ethereum")
+        assert len(results) == 3
+
+        market_results = [r for r in results if r.vault_id == "0xmarket1"]
+        assert len(market_results) == 1
+
+        first = next(r for r in results if r.vault_id == "0xabc123")
+        assert first.vault_name == "Steakhouse USDC"
+        assert first.asset_symbol == "USDC"
+        assert first.protocol == "morpho"
+        assert first.chain == "ethereum"
+        assert first.net_apy == Decimal("0.0765")
+        assert first.apy_gross == Decimal("0.085")
+        assert first.tvl_usd == Decimal("50000000")
+        assert first.performance_fee_pct == Decimal("0.1")
+        assert first.redemption_type == "instant"
+
+    async def test_filters_by_vault_addresses(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+        vault_resp = MagicMock(spec=httpx.Response)
+        vault_resp.status_code = 200
+        vault_resp.raise_for_status = MagicMock()
+        vault_resp.json.return_value = self._vault_response()
+
+        market_resp = MagicMock(spec=httpx.Response)
+        market_resp.status_code = 200
+        market_resp.raise_for_status = MagicMock()
+        market_resp.json.return_value = self._market_response()
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+        mock_http.post = AsyncMock(
+            side_effect=[vault_resp, market_resp],
+        )
+        adapter._http_client = mock_http
+        adapter._owns_http = False
+
+        results = await adapter.fetch_live_metrics(
+            ["0xAbC123"],
+            "ethereum",
+        )
+        assert len(results) == 1
+        assert results[0].vault_id == "0xabc123"
+
+    async def test_empty_response(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+        empty_resp = MagicMock(spec=httpx.Response)
+        empty_resp.status_code = 200
+        empty_resp.raise_for_status = MagicMock()
+        empty_resp.json.return_value = {
+            "data": {"vaults": {"items": []}},
+        }
+
+        empty_m = MagicMock(spec=httpx.Response)
+        empty_m.status_code = 200
+        empty_m.raise_for_status = MagicMock()
+        empty_m.json.return_value = {
+            "data": {"markets": {"items": []}},
+        }
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+        mock_http.post = AsyncMock(
+            side_effect=[empty_resp, empty_m],
+        )
+        adapter._http_client = mock_http
+        adapter._owns_http = False
+
+        results = await adapter.fetch_live_metrics([], "ethereum")
+        assert results == []
+
+    async def test_unsupported_chain_returns_empty(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+        results = await adapter.fetch_live_metrics([], "solana")
+        assert results == []
+
+    async def test_graphql_error_returns_empty(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+        error_resp = MagicMock(spec=httpx.Response)
+        error_resp.status_code = 200
+        error_resp.raise_for_status = MagicMock()
+        error_resp.json.return_value = {
+            "errors": [{"message": "rate limited"}],
+        }
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+        mock_http.post = AsyncMock(return_value=error_resp)
+        adapter._http_client = mock_http
+        adapter._owns_http = False
+
+        results = await adapter.fetch_live_metrics([], "ethereum")
+        assert results == []
+
+    async def test_market_metrics_mapping(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+        vault_resp = MagicMock(spec=httpx.Response)
+        vault_resp.status_code = 200
+        vault_resp.raise_for_status = MagicMock()
+        vault_resp.json.return_value = {
+            "data": {"vaults": {"items": []}},
+        }
+
+        market_resp = MagicMock(spec=httpx.Response)
+        market_resp.status_code = 200
+        market_resp.raise_for_status = MagicMock()
+        market_resp.json.return_value = self._market_response()
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+        mock_http.post = AsyncMock(
+            side_effect=[vault_resp, market_resp],
+        )
+        adapter._http_client = mock_http
+        adapter._owns_http = False
+
+        results = await adapter.fetch_live_metrics([], "ethereum")
+        assert len(results) == 1
+        m = results[0]
+        assert m.vault_id == "0xmarket1"
+        assert m.supply_rate == Decimal("0.045")
+        assert m.borrow_rate == Decimal("0.06")
+        assert m.utilisation_rate == Decimal("0.7")
+        assert m.tvl_usd == Decimal("10000000")
+        assert m.vault_name == "Morpho Blue USDC/WETH"
+
+
+class TestMorphoFetchPositions:
+    """Test fetch_positions with mocked GraphQL responses."""
+
+    @staticmethod
+    def _positions_response() -> dict:
+        return {
+            "data": {
+                "userByAddress": {
+                    "address": "0xuser123",
+                    "vaultPositions": [
+                        {
+                            "vault": {
+                                "address": "0xVault1",
+                                "name": "Steakhouse USDC",
+                            },
+                            "assets": "1000000000",
+                            "assetsUsd": "1000",
+                            "shares": "950000000",
+                        },
+                    ],
+                    "marketPositions": [
+                        {
+                            "market": {
+                                "uniqueKey": "0xMarketKey1",
+                                "loanAsset": {
+                                    "address": "0xUSDC",
+                                    "symbol": "USDC",
+                                },
+                                "collateralAsset": {
+                                    "address": "0xWETH",
+                                    "symbol": "WETH",
+                                },
+                            },
+                            "supplyAssets": "5000000",
+                            "supplyAssetsUsd": "5000",
+                            "borrowAssets": "2000000",
+                            "borrowAssetsUsd": "2000",
+                        },
+                    ],
+                },
+            },
+        }
+
+    async def test_fetches_vault_and_market_positions(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = self._positions_response()
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+        mock_http.post = AsyncMock(return_value=mock_response)
+        adapter._http_client = mock_http
+        adapter._owns_http = False
+
+        results = await adapter.fetch_positions("0xuser123", "ethereum")
+        assert len(results) == 3
+
+        vault_pos = results[0]
+        assert vault_pos.position_type == "supply"
+        assert vault_pos.vault_or_market_id == "0xvault1"
+        assert vault_pos.current_shares_or_amount == Decimal("950000000")
+        assert vault_pos.protocol == "morpho"
+        assert vault_pos.chain == "ethereum"
+
+        supply_pos = results[1]
+        assert supply_pos.position_type == "supply"
+        assert supply_pos.vault_or_market_id == "0xmarketkey1"
+        assert supply_pos.current_shares_or_amount == Decimal("5000000")
+        assert supply_pos.asset_symbol == "USDC"
+
+        borrow_pos = results[2]
+        assert borrow_pos.position_type == "borrow"
+        assert borrow_pos.vault_or_market_id == "0xmarketkey1"
+        assert borrow_pos.current_shares_or_amount == Decimal("2000000")
+
+    async def test_no_user_returns_empty(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "data": {"userByAddress": None},
+        }
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+        mock_http.post = AsyncMock(return_value=mock_response)
+        adapter._http_client = mock_http
+        adapter._owns_http = False
+
+        results = await adapter.fetch_positions("0xnoone", "ethereum")
+        assert results == []
+
+    async def test_zero_shares_skipped(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "data": {
+                "userByAddress": {
+                    "address": "0xuser",
+                    "vaultPositions": [
+                        {
+                            "vault": {"address": "0xV1", "name": "V1"},
+                            "assets": "0",
+                            "assetsUsd": "0",
+                            "shares": "0",
+                        },
+                    ],
+                    "marketPositions": [
+                        {
+                            "market": {
+                                "uniqueKey": "0xM1",
+                                "loanAsset": {
+                                    "address": "0xU",
+                                    "symbol": "USDC",
+                                },
+                                "collateralAsset": {
+                                    "address": "0xW",
+                                    "symbol": "WETH",
+                                },
+                            },
+                            "supplyAssets": "0",
+                            "supplyAssetsUsd": "0",
+                            "borrowAssets": "0",
+                            "borrowAssetsUsd": "0",
+                        },
+                    ],
+                },
+            },
+        }
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+        mock_http.post = AsyncMock(return_value=mock_response)
+        adapter._http_client = mock_http
+        adapter._owns_http = False
+
+        results = await adapter.fetch_positions("0xuser", "ethereum")
+        assert results == []
+
+    async def test_unsupported_chain_returns_empty(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+        results = await adapter.fetch_positions("0xwallet", "solana")
+        assert results == []
+
+    async def test_graphql_error_returns_empty(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+        error_resp = MagicMock(spec=httpx.Response)
+        error_resp.status_code = 200
+        error_resp.raise_for_status = MagicMock()
+        error_resp.json.return_value = {
+            "errors": [{"message": "internal error"}],
+        }
+
+        mock_http = AsyncMock(spec=httpx.AsyncClient)
+        mock_http.post = AsyncMock(return_value=error_resp)
+        adapter._http_client = mock_http
+        adapter._owns_http = False
+
+        results = await adapter.fetch_positions("0xwallet", "ethereum")
+        assert results == []
+
+
+class TestMorphoFetchHistoricalEvents:
+    """Test fetch_historical_events with mocked HyperSync."""
+
+    async def test_unsupported_chain_returns_empty(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+        result = await adapter.fetch_historical_events(
+            "0xwallet",
+            "solana",
+            0,
+            100,
+        )
         assert result == []
+
+    async def test_delegates_to_hypersync(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+
+        mock_log = MagicMock()
+        mock_log.topics = [
+            "0xedf8870433c83823eb071d3df1caa8d008f12f6440918c20d711e0d3a0082022",
+            "0x" + "0" * 24 + "abcdef1234567890abcdef1234567890abcdef12",
+        ]
+        mock_log.address = "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb"
+        mock_log.block_number = 20_000_001
+        mock_log.transaction_hash = "0xdeadbeef"
+        mock_log.data = "0x" + "0" * 49 + "de0b6b3a7640000"
+        mock_log.log_index = 0
+
+        mock_block = MagicMock()
+        mock_block.number = 20_000_001
+        mock_block.timestamp = 1700000000
+
+        mock_data = MagicMock()
+        mock_data.logs = [mock_log]
+        mock_data.blocks = [mock_block]
+
+        mock_result = MagicMock()
+        mock_result.data = mock_data
+        mock_result.next_block = 20_000_100
+        mock_result.archive_height = 20_000_100
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_result)
+
+        with (
+            patch(
+                "app.adapters.morpho.get_hypersync_client",
+                return_value=mock_client,
+            ),
+            patch(
+                "app.adapters.morpho.get_chain_height",
+                new_callable=AsyncMock,
+                return_value=20_000_100,
+            ),
+        ):
+            results = await adapter.fetch_historical_events(
+                "0xabcdef1234567890abcdef1234567890abcdef12",
+                "ethereum",
+                20_000_000,
+                20_000_100,
+            )
+
+        assert len(results) == 1
+        event = results[0]
+        assert event.protocol == "morpho"
+        assert event.action == "deposit"
+        assert event.chain == "ethereum"
+        assert event.block_number == 20_000_001
+        assert event.tx_hash == "0xdeadbeef"
+
+    async def test_auto_resolves_to_block(self) -> None:
+        from app.adapters.morpho import MorphoAdapter
+
+        adapter = MorphoAdapter()
+
+        mock_data = MagicMock()
+        mock_data.logs = []
+        mock_data.blocks = []
+
+        mock_result = MagicMock()
+        mock_result.data = mock_data
+        mock_result.next_block = 20_000_100
+        mock_result.archive_height = 20_000_100
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_result)
+
+        mock_get_height = AsyncMock(return_value=20_000_100)
+
+        with (
+            patch(
+                "app.adapters.morpho.get_hypersync_client",
+                return_value=mock_client,
+            ),
+            patch(
+                "app.adapters.morpho.get_chain_height",
+                mock_get_height,
+            ),
+        ):
+            results = await adapter.fetch_historical_events(
+                "0xwallet",
+                "ethereum",
+                20_000_000,
+                0,
+            )
+
+        mock_get_height.assert_awaited_once_with(mock_client)
+        assert results == []
+
+
+class TestMorphoHelpers:
+    """Test Morpho adapter helper functions."""
+
+    def test_safe_decimal_valid(self) -> None:
+        from app.adapters.morpho import _safe_decimal
+
+        assert _safe_decimal(0.5) == Decimal("0.5")
+        assert _safe_decimal("123.45") == Decimal("123.45")
+        assert _safe_decimal(100) == Decimal("100")
+
+    def test_safe_decimal_none(self) -> None:
+        from app.adapters.morpho import _safe_decimal
+
+        assert _safe_decimal(None) is None
+
+    def test_safe_decimal_invalid(self) -> None:
+        from app.adapters.morpho import _safe_decimal
+
+        assert _safe_decimal("not_a_number") is None
+
+    def test_pad_address(self) -> None:
+        from app.adapters.morpho import _pad_address
+
+        result = _pad_address(
+            "0xAbCdEf1234567890AbCdEf1234567890AbCdEf12",
+        )
+        assert len(result) == 66
+        assert result.startswith("0x000000000000000000000000abcdef")
+
+    def test_unpad_address(self) -> None:
+        from app.adapters.morpho import _unpad_address
+
+        padded = "0x000000000000000000000000abcdef1234567890abcdef1234567890abcdef12"
+        result = _unpad_address(padded)
+        assert result == "0xabcdef1234567890abcdef1234567890abcdef12"
+
+    def test_decode_uint256(self) -> None:
+        from app.adapters.morpho import _decode_uint256
+
+        hex_data = "0x" + "0" * 49 + "de0b6b3a7640000"
+        result = _decode_uint256(hex_data, 0)
+        assert result == 10**18
+
+    def test_amount_to_decimal(self) -> None:
+        from app.adapters.morpho import _amount_to_decimal
+
+        result = _amount_to_decimal(10**18, 18)
+        assert result == Decimal("1")
+
+        result = _amount_to_decimal(10**6, 6)
+        assert result == Decimal("1")
+
+
+class TestMorphoGraphQLError:
+    """Test MorphoGraphQLError exception."""
+
+    def test_error_message_formatting(self) -> None:
+        from app.adapters.morpho import MorphoGraphQLError
+
+        err = MorphoGraphQLError(
+            [
+                {"message": "first error"},
+                {"message": "second error"},
+            ]
+        )
+        assert "first error" in str(err)
+        assert "second error" in str(err)
+        assert len(err.errors) == 2
+
+    def test_error_without_message_key(self) -> None:
+        from app.adapters.morpho import MorphoGraphQLError
+
+        err = MorphoGraphQLError([{"code": "RATE_LIMITED"}])
+        assert "RATE_LIMITED" in str(err)
 
 
 class TestAaveAdapter:
@@ -681,8 +1325,14 @@ class TestRawEventSchema:
 
     def test_valid_actions(self) -> None:
         for action in (
-            "deposit", "withdraw", "borrow", "repay",
-            "claim", "transfer_in", "transfer_out", "swap",
+            "deposit",
+            "withdraw",
+            "borrow",
+            "repay",
+            "claim",
+            "transfer_in",
+            "transfer_out",
+            "swap",
         ):
             e = RawEvent(
                 wallet_address="0x1",
