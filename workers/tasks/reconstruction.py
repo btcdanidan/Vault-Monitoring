@@ -21,7 +21,6 @@ from datetime import UTC, datetime
 import redis
 import structlog
 from sqlalchemy import text
-
 from workers.celery_app import app
 from workers.database import get_sync_session
 from workers.services.event_scanner import scan_events
@@ -30,6 +29,7 @@ from workers.services.position_computer import compute_positions
 from workers.services.price_backfill import backfill_prices
 from workers.services.progress_tracker import ProgressTracker
 from workers.services.schemas import ReconstructionPhase
+from workers.services.vault_discovery import discover_vaults_from_raw_events
 
 logger = structlog.get_logger(__name__)
 
@@ -104,6 +104,15 @@ def reconstruct_wallet_history(self, wallet_id: str, user_id: str) -> None:  # t
             events=len(raw_events),
             highest_block=highest_block,
         )
+
+        # Vault discovery: register any vaults referenced in the events
+        if raw_events:
+            vaults_registered = discover_vaults_from_raw_events(raw_events)
+            logger.info(
+                "reconstruction_vaults_discovered",
+                wallet_id=wallet_id,
+                vaults=vaults_registered,
+            )
 
         if not raw_events:
             _finalise_wallet(wallet_uuid, "synced", highest_block)

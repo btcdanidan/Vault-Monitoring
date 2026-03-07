@@ -20,6 +20,19 @@ import redis
 import structlog
 from sqlalchemy import text
 
+refresh_vault_metrics: Fetch live metrics for all tracked vaults every 5 min.
+check_vault_lifecycle: Daily check to detrack zero-TVL vaults after 7 days.
+compute_vault_whale_concentration: Placeholder for whale concentration.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+from collections import defaultdict
+
+import redis
+import structlog
 from workers.celery_app import app
 from workers.database import get_sync_session
 
@@ -361,4 +374,3 @@ def refresh_vault_metrics(self) -> None:  # type: ignore[no-untyped-def]
 @app.task(name="workers.tasks.vault_metrics.compute_vault_whale_concentration")
 def compute_vault_whale_concentration() -> None:
     """Placeholder: compute whale concentration per vault (6h regular / 24h full)."""
-    pass
