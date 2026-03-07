@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
@@ -43,23 +44,23 @@ class Recommendation(Base):
     status_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    apy_source_at_creation: Mapped[float | None] = mapped_column(
+    apy_source_at_creation: Mapped[Decimal | None] = mapped_column(
         Numeric(8, 4), nullable=True
     )
-    apy_target_at_creation: Mapped[float | None] = mapped_column(
+    apy_target_at_creation: Mapped[Decimal | None] = mapped_column(
         Numeric(8, 4), nullable=True
     )
-    risk_source_at_creation: Mapped[float | None] = mapped_column(
+    risk_source_at_creation: Mapped[Decimal | None] = mapped_column(
         Numeric(5, 1), nullable=True
     )
-    risk_target_at_creation: Mapped[float | None] = mapped_column(
+    risk_target_at_creation: Mapped[Decimal | None] = mapped_column(
         Numeric(5, 1), nullable=True
     )
-    net_benefit_usd_30d: Mapped[float | None] = mapped_column(
+    net_benefit_usd_30d: Mapped[Decimal | None] = mapped_column(
         Numeric(12, 2), nullable=True
     )
-    gas_cost_usd: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
-    bridge_cost_usd: Mapped[float | None] = mapped_column(
+    gas_cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    bridge_cost_usd: Mapped[Decimal | None] = mapped_column(
         Numeric(10, 2), nullable=True
     )
     rationale_text: Mapped[str | None] = mapped_column(Text, nullable=True)

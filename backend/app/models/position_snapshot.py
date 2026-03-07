@@ -1,6 +1,7 @@
 """PositionSnapshot model — time-series snapshots for P&L charting (§10, hypertable)."""
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import DateTime, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID
@@ -26,22 +27,22 @@ class PositionSnapshot(Base):
     timestamp: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), primary_key=True, nullable=False
     )
-    value_usd: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
-    cost_basis_fifo_usd: Mapped[float | None] = mapped_column(
+    value_usd: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    cost_basis_fifo_usd: Mapped[Decimal | None] = mapped_column(
         Numeric(18, 2), nullable=True
     )
-    cost_basis_wac_usd: Mapped[float | None] = mapped_column(
+    cost_basis_wac_usd: Mapped[Decimal | None] = mapped_column(
         Numeric(18, 2), nullable=True
     )
-    cumulative_yield_usd: Mapped[float | None] = mapped_column(
+    cumulative_yield_usd: Mapped[Decimal | None] = mapped_column(
         Numeric(18, 2), nullable=True
     )
-    cumulative_borrow_cost_usd: Mapped[float | None] = mapped_column(
+    cumulative_borrow_cost_usd: Mapped[Decimal | None] = mapped_column(
         Numeric(18, 2), nullable=True
     )
-    net_pnl_fifo_usd: Mapped[float | None] = mapped_column(
+    net_pnl_fifo_usd: Mapped[Decimal | None] = mapped_column(
         Numeric(18, 2), nullable=True
     )
-    net_pnl_wac_usd: Mapped[float | None] = mapped_column(
+    net_pnl_wac_usd: Mapped[Decimal | None] = mapped_column(
         Numeric(18, 2), nullable=True
     )

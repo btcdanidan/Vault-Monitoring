@@ -12,13 +12,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import os
+
 import hypersync
 import structlog
-
-from app.config import get_settings
-
-if TYPE_CHECKING:
-    pass
 
 logger = structlog.get_logger(__name__)
 
@@ -103,7 +100,7 @@ def get_hypersync_client(chain: str) -> hypersync.HypersyncClient:
         supported = ", ".join(sorted(HYPERSYNC_CHAINS))
         raise ValueError(f"Unsupported chain {chain!r}. Supported: {supported}")
 
-    token = get_settings().envio_api_token
+    token = os.getenv("ENVIO_API_TOKEN", "")
     client_config = hypersync.ClientConfig(url=cfg.url, bearer_token=token or None)
     logger.info(
         "hypersync_client_created",

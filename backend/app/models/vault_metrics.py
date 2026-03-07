@@ -1,5 +1,7 @@
 """VaultMetrics model — time-series metrics per vault (§10, hypertable)."""
 
+from decimal import Decimal
+
 from sqlalchemy import Date, DateTime, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,19 +22,19 @@ class VaultMetrics(Base):
     timestamp: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), primary_key=True, nullable=False
     )
-    apy_gross: Mapped[float | None] = mapped_column(Numeric(8, 4), nullable=True)
-    apy_base: Mapped[float | None] = mapped_column(Numeric(8, 4), nullable=True)
-    apy_reward: Mapped[float | None] = mapped_column(Numeric(8, 4), nullable=True)
-    performance_fee_pct: Mapped[float | None] = mapped_column(
+    apy_gross: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
+    apy_base: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
+    apy_reward: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
+    performance_fee_pct: Mapped[Decimal | None] = mapped_column(
         Numeric(5, 2), nullable=True
     )
-    mgmt_fee_pct: Mapped[float | None] = mapped_column(Numeric(6, 4), nullable=True)
-    net_apy: Mapped[float | None] = mapped_column(Numeric(8, 4), nullable=True)
-    tvl_usd: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
-    tvl_native: Mapped[float | None] = mapped_column(Numeric(24, 8), nullable=True)
-    utilisation_rate: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
-    supply_rate: Mapped[float | None] = mapped_column(Numeric(8, 4), nullable=True)
-    borrow_rate: Mapped[float | None] = mapped_column(Numeric(8, 4), nullable=True)
+    mgmt_fee_pct: Mapped[Decimal | None] = mapped_column(Numeric(6, 4), nullable=True)
+    net_apy: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
+    tvl_usd: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    tvl_native: Mapped[Decimal | None] = mapped_column(Numeric(24, 8), nullable=True)
+    utilisation_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    supply_rate: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
+    borrow_rate: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
     redemption_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     redemption_days_est: Mapped[int | None] = mapped_column(Integer, nullable=True)
     maturity_date: Mapped[Date | None] = mapped_column(Date, nullable=True)

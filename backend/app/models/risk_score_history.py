@@ -1,5 +1,7 @@
 """RiskScoreHistory model — risk score audit trail (§10, hypertable)."""
 
+from decimal import Decimal
+
 from sqlalchemy import DateTime, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -17,8 +19,8 @@ class RiskScoreHistory(Base):
     timestamp: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), primary_key=True, nullable=False
     )
-    previous_score: Mapped[float | None] = mapped_column(Numeric(5, 1), nullable=True)
-    new_score: Mapped[float | None] = mapped_column(Numeric(5, 1), nullable=True)
+    previous_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)
+    new_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)
     grade_before: Mapped[str | None] = mapped_column(String(1), nullable=True)
     grade_after: Mapped[str | None] = mapped_column(String(1), nullable=True)
     changed_layers: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

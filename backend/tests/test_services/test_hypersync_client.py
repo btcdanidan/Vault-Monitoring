@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -52,11 +53,8 @@ class TestGetHypersyncClient:
     """Client factory function."""
 
     @patch("app.services.hypersync_client.hypersync")
-    @patch("app.services.hypersync_client.get_settings")
-    def test_creates_ethereum_client(
-        self, mock_settings: MagicMock, mock_hs: MagicMock
-    ) -> None:
-        mock_settings.return_value.envio_api_token = "test-token"
+    @patch.dict(os.environ, {"ENVIO_API_TOKEN": "test-token"})
+    def test_creates_ethereum_client(self, mock_hs: MagicMock) -> None:
         mock_hs.ClientConfig.return_value = "cfg"
         mock_hs.HypersyncClient.return_value = "client"
 
@@ -69,11 +67,8 @@ class TestGetHypersyncClient:
         assert result == "client"
 
     @patch("app.services.hypersync_client.hypersync")
-    @patch("app.services.hypersync_client.get_settings")
-    def test_creates_base_client(
-        self, mock_settings: MagicMock, mock_hs: MagicMock
-    ) -> None:
-        mock_settings.return_value.envio_api_token = "base-token"
+    @patch.dict(os.environ, {"ENVIO_API_TOKEN": "base-token"})
+    def test_creates_base_client(self, mock_hs: MagicMock) -> None:
         mock_hs.ClientConfig.return_value = "cfg"
         mock_hs.HypersyncClient.return_value = "client"
 
@@ -85,11 +80,8 @@ class TestGetHypersyncClient:
         assert result == "client"
 
     @patch("app.services.hypersync_client.hypersync")
-    @patch("app.services.hypersync_client.get_settings")
-    def test_case_insensitive(
-        self, mock_settings: MagicMock, mock_hs: MagicMock
-    ) -> None:
-        mock_settings.return_value.envio_api_token = ""
+    @patch.dict(os.environ, {"ENVIO_API_TOKEN": ""})
+    def test_case_insensitive(self, mock_hs: MagicMock) -> None:
         mock_hs.ClientConfig.return_value = "cfg"
         mock_hs.HypersyncClient.return_value = "client"
 
@@ -103,11 +95,8 @@ class TestGetHypersyncClient:
             get_hypersync_client("solana")
 
     @patch("app.services.hypersync_client.hypersync")
-    @patch("app.services.hypersync_client.get_settings")
-    def test_empty_token_passes_none(
-        self, mock_settings: MagicMock, mock_hs: MagicMock
-    ) -> None:
-        mock_settings.return_value.envio_api_token = ""
+    @patch.dict(os.environ, {"ENVIO_API_TOKEN": ""})
+    def test_empty_token_passes_none(self, mock_hs: MagicMock) -> None:
         mock_hs.ClientConfig.return_value = "cfg"
         mock_hs.HypersyncClient.return_value = "client"
 

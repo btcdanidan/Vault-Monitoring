@@ -99,15 +99,15 @@ class PositionAccumulator:
     def cost_basis_wac(self) -> Decimal:
         """WAC cost basis = current_amount * weighted_average_price.
 
-        WAC price = sum(lot_amount * lot_price) / sum(lot_amount) across all
-        open deposit-like lots.
+        WAC price = sum(remaining_amount * lot_price) / sum(remaining_amount)
+        across all open deposit-like lots.
         """
         total_cost = D_ZERO
         total_amount = D_ZERO
         for lot in self.lots:
             if lot.action in DEPOSIT_LIKE and lot.remaining_amount > D_ZERO and lot.price_usd is not None:
-                total_cost += lot.amount * lot.price_usd
-                total_amount += lot.amount
+                total_cost += lot.remaining_amount * lot.price_usd
+                total_amount += lot.remaining_amount
         if total_amount == D_ZERO:
             return D_ZERO
         wac_price = total_cost / total_amount
@@ -138,8 +138,8 @@ class PositionAccumulator:
         total_amount = D_ZERO
         for lot in self.lots:
             if lot.action in DEPOSIT_LIKE and lot.remaining_amount > D_ZERO and lot.price_usd is not None:
-                total_cost += lot.amount * lot.price_usd
-                total_amount += lot.amount
+                total_cost += lot.remaining_amount * lot.price_usd
+                total_amount += lot.remaining_amount
         if total_amount == D_ZERO or withdraw_price is None:
             return
         wac_price = total_cost / total_amount
@@ -194,6 +194,21 @@ def compute_positions(wallet_id: str, user_id: str) -> int:
             {"user_id": user_id, "wallet_id": wallet_id},
         ).fetchall()
 
+        # Query existing position IDs to reuse on upsert (prevents orphans)
+        existing_positions = session.execute(
+            text("""
+                SELECT id, chain, protocol, vault_or_market_id, position_type
+                FROM positions
+                WHERE user_id = :user_id AND wallet_id = :wallet_id
+            """),
+            {"user_id": user_id, "wallet_id": wallet_id},
+        ).fetchall()
+
+    existing_pos_map: dict[tuple[str, str, str, str], str] = {
+        (row[1], row[2], row[3], row[4]): str(row[0])
+        for row in existing_positions
+    }
+
     if not lot_rows:
         logger.info("compute_positions_no_lots", wallet_id=wallet_id)
         return 0
@@ -213,7 +228,10 @@ def compute_positions(wallet_id: str, user_id: str) -> int:
         group_key = (chain, protocol, vault_or_market_id, position_type)
 
         if group_key not in groups:
+            # Reuse existing position ID if available, otherwise generate new
+            existing_id = existing_pos_map.get(group_key)
             acc = PositionAccumulator(
+                position_id=existing_id or str(uuid.uuid4()),
                 chain=chain,
                 protocol=protocol,
                 vault_or_market_id=vault_or_market_id,
@@ -291,7 +309,8 @@ def _upsert_position(
                 :reconstruction_status, :adapter_type,
                 :created_at, :last_updated
             )
-            ON CONFLICT (id) DO UPDATE SET
+            ON CONFLICT (user_id, wallet_id, chain, protocol, vault_or_market_id, position_type)
+            DO UPDATE SET
                 current_shares_or_amount = EXCLUDED.current_shares_or_amount,
                 cost_basis_fifo_usd = EXCLUDED.cost_basis_fifo_usd,
                 cost_basis_wac_usd = EXCLUDED.cost_basis_wac_usd,
@@ -366,17 +385,21 @@ def _update_lot_remaining_amounts(session: object, acc: PositionAccumulator) -> 
 
 
 def _link_lots_to_position(session: object, acc: PositionAccumulator) -> None:
-    """Set position_id on all lots belonging to this position."""
+    """Set position_id on all lots belonging to this position.
+
+    Uses batch UPDATE. Allows re-linking on recomputation (no IS NULL guard)
+    so that lots are always associated with the correct position.
+    """
     lot_ids = [lot.lot_id for lot in acc.lots]
     if not lot_ids:
         return
 
-    for lot_id in lot_ids:
-        session.execute(  # type: ignore[union-attr]
-            text("""
-                UPDATE transaction_lots
-                SET position_id = :position_id
-                WHERE id = :lot_id AND position_id IS NULL
-            """),
-            {"position_id": acc.position_id, "lot_id": lot_id},
-        )
+    # Batch update all lots at once instead of N+1 individual queries
+    session.execute(  # type: ignore[union-attr]
+        text("""
+            UPDATE transaction_lots
+            SET position_id = :position_id
+            WHERE id = ANY(:lot_ids)
+        """),
+        {"position_id": acc.position_id, "lot_ids": lot_ids},
+    )

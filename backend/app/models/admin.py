@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import DateTime, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -23,7 +24,7 @@ class ApiUsageLog(Base):
     )
     service_name: Mapped[str] = mapped_column(String(100), nullable=False)
     usage_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    cost_usd: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
 
 
 class CostServiceConfig(Base):

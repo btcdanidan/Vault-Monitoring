@@ -46,6 +46,7 @@ async def get_current_user_id(
             token,
             settings.supabase_jwt_secret,
             algorithms=["HS256"],
+            audience="authenticated",
             options={"require": ["exp", "sub"]},
         )
     except jwt.ExpiredSignatureError:
@@ -62,6 +63,13 @@ async def get_current_user_id(
         raise UnauthorizedException(detail="Invalid sub claim") from None
     email = payload.get("email")
 
+    # RLS: set session variable BEFORE any DB queries so RLS policies apply
+    if db.get_bind().dialect.name == "postgresql":
+        await db.execute(
+            text("SET LOCAL app.current_user_id = :uid"),
+            {"uid": str(user_id)},
+        )
+
     profile = await get_or_create_profile(db, user_id, email)
 
     if profile.rejected:
@@ -70,13 +78,6 @@ async def get_current_user_id(
         raise ForbiddenException(
             detail="Account pending approval",
             reason="pending_approval",
-        )
-
-    # RLS: set session variable for PostgreSQL (no-op on SQLite for tests)
-    if db.get_bind().dialect.name == "postgresql":
-        await db.execute(
-            text("SET LOCAL app.current_user_id = :uid"),
-            {"uid": str(user_id)},
         )
 
     request.state.user_id = user_id
