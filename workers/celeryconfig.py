@@ -83,13 +83,17 @@ _FULL_BEAT_SCHEDULE: dict[str, dict] = {
         "schedule": crontab(minute=0),  # every hour
         "options": {"queue": "default"},
     },
+    "check-vault-lifecycle": {
+        "task": "workers.tasks.vault_metrics.check_vault_lifecycle",
+        "schedule": crontab(minute=0, hour=3),  # daily 03:00 UTC
+        "options": {"queue": "default"},
+    },
 }
 
 # Tasks whose implementations are still placeholders.  Remove a key here
 # when the corresponding sprint delivers a real implementation.
 _DISABLED_TASKS: set[str] = {
     "refresh-health-factors",
-    "refresh-vault-metrics",
     "snapshot-positions",
     "refresh-pendle-positions",
     "sync-new-events",
