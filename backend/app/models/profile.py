@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import Boolean, DateTime, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
@@ -23,7 +24,7 @@ class Profile(Base):
     approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     rejected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    capital_gains_tax_rate: Mapped[float] = mapped_column(
+    capital_gains_tax_rate: Mapped[Decimal] = mapped_column(
         Numeric(4, 1), default=0, nullable=False
     )
     cost_basis_default: Mapped[str] = mapped_column(

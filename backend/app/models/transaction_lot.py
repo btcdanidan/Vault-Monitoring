@@ -1,6 +1,7 @@
 """TransactionLot model — immutable deposit/withdraw/borrow/repay events (§10, hypertable)."""
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -41,9 +42,9 @@ class TransactionLot(Base):
     action: Mapped[str] = mapped_column(String(15), nullable=False)
     asset_symbol: Mapped[str | None] = mapped_column(String(20), nullable=True)
     asset_address: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    amount: Mapped[float] = mapped_column(Numeric(30, 12), nullable=False)
-    amount_usd: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
-    price_per_unit_usd: Mapped[float | None] = mapped_column(
+    amount: Mapped[Decimal] = mapped_column(Numeric(30, 12), nullable=False)
+    amount_usd: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    price_per_unit_usd: Mapped[Decimal | None] = mapped_column(
         Numeric(24, 8), nullable=True
     )
     timestamp: Mapped[DateTime] = mapped_column(
@@ -52,20 +53,20 @@ class TransactionLot(Base):
     tx_hash: Mapped[str | None] = mapped_column(String(100), nullable=True)
     block_number: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     lot_status: Mapped[str] = mapped_column(String(20), default="open", nullable=False)
-    remaining_amount: Mapped[float | None] = mapped_column(
+    remaining_amount: Mapped[Decimal | None] = mapped_column(
         Numeric(30, 12), nullable=True
     )
     source: Mapped[str] = mapped_column(String(15), default="auto", nullable=False)
-    original_price_usd: Mapped[float | None] = mapped_column(
+    original_price_usd: Mapped[Decimal | None] = mapped_column(
         Numeric(24, 8), nullable=True
     )
-    user_price_usd: Mapped[float | None] = mapped_column(
+    user_price_usd: Mapped[Decimal | None] = mapped_column(
         Numeric(24, 8), nullable=True
     )
     price_overridden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     pendle_position_type: Mapped[str | None] = mapped_column(String(5), nullable=True)
-    pendle_implied_apy_at_entry: Mapped[float | None] = mapped_column(
+    pendle_implied_apy_at_entry: Mapped[Decimal | None] = mapped_column(
         Numeric(6, 3), nullable=True
     )
     pendle_maturity_date: Mapped[Date | None] = mapped_column(Date, nullable=True)

@@ -1,5 +1,7 @@
 """PriceHistory model — historical token prices (§10, hypertable)."""
 
+from decimal import Decimal
+
 from sqlalchemy import DateTime, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,5 +18,5 @@ class PriceHistory(Base):
     timestamp: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), primary_key=True, nullable=False
     )
-    price_usd: Mapped[float | None] = mapped_column(Numeric(24, 8), nullable=True)
+    price_usd: Mapped[Decimal | None] = mapped_column(Numeric(24, 8), nullable=True)
     source: Mapped[str | None] = mapped_column(String(20), nullable=True)
