@@ -89,7 +89,6 @@ _FULL_BEAT_SCHEDULE: dict[str, dict] = {
 # when the corresponding sprint delivers a real implementation.
 _DISABLED_TASKS: set[str] = {
     "refresh-health-factors",
-    "refresh-vault-metrics",
     "snapshot-positions",
     "refresh-pendle-positions",
     "sync-new-events",
