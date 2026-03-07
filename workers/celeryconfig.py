@@ -96,7 +96,6 @@ _DISABLED_TASKS: set[str] = {
     "refresh-health-factors",
     "snapshot-positions",
     "refresh-pendle-positions",
-    "sync-new-events",
     "track-api-usage",
     "compute-risk-scores",
     "compute-vault-whale-concentration",
