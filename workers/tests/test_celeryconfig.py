@@ -150,7 +150,6 @@ class TestScheduleIntervals:
 _ENABLED_S10_TASKS: set[str] = {
     "refresh-prices",
     "refresh-vault-metrics",
-    "sync-new-events",
 }
 
 
