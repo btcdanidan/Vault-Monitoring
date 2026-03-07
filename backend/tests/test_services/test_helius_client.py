@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -89,21 +90,18 @@ class TestHeliusConfig:
     def test_signatures_max_limit(self) -> None:
         assert SIGNATURES_MAX_LIMIT == 1_000
 
-    @patch("app.services.helius_client.get_settings")
-    def test_rpc_url_construction(self, mock_settings: MagicMock) -> None:
-        mock_settings.return_value = _mock_settings()
+    @patch.dict(os.environ, {"HELIUS_API_KEY": "test-helius-key", "HELIUS_BASE_URL": "https://mainnet.helius-rpc.com"})
+    def test_rpc_url_construction(self) -> None:
         url = get_helius_rpc_url()
         assert url == "https://mainnet.helius-rpc.com/?api-key=test-helius-key"
 
-    @patch("app.services.helius_client.get_settings")
-    def test_rpc_url_custom_base(self, mock_settings: MagicMock) -> None:
-        mock_settings.return_value = _mock_settings(base_url="https://devnet.helius-rpc.com")
+    @patch.dict(os.environ, {"HELIUS_API_KEY": "test-helius-key", "HELIUS_BASE_URL": "https://devnet.helius-rpc.com"})
+    def test_rpc_url_custom_base(self) -> None:
         url = get_helius_rpc_url()
         assert url == "https://devnet.helius-rpc.com/?api-key=test-helius-key"
 
-    @patch("app.services.helius_client.get_settings")
-    def test_missing_api_key_raises(self, mock_settings: MagicMock) -> None:
-        mock_settings.return_value = _mock_settings(api_key="")
+    @patch.dict(os.environ, {"HELIUS_API_KEY": ""}, clear=False)
+    def test_missing_api_key_raises(self) -> None:
         with pytest.raises(ValueError, match="HELIUS_API_KEY is not configured"):
             get_helius_rpc_url()
 

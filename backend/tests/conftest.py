@@ -27,6 +27,7 @@ def make_token(
     now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
+        "aud": "authenticated",
         "exp": now - timedelta(hours=1) if expired else now + timedelta(hours=1),
         "iat": now,
     }
