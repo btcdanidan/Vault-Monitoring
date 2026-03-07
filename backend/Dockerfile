@@ -4,6 +4,7 @@ WORKDIR /app
 
 # When built from repo root (infra/docker-compose): use backend/ prefix
 COPY backend/pyproject.toml ./
+COPY backend/README.md ./
 COPY backend/app ./app
 COPY backend/alembic.ini ./
 COPY backend/alembic ./alembic
