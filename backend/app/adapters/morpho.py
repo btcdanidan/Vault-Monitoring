@@ -8,13 +8,13 @@ References: §9 (Data Sources), §10 (System Architecture).
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import httpx
 import hypersync
-import structlog
 
 from app.adapters.base import BaseProtocolAdapter
 from app.adapters.registry import register_adapter
@@ -25,18 +25,11 @@ from app.services.hypersync_client import (
     get_hypersync_client,
 )
 
-logger = structlog.get_logger(__name__)
-
 MORPHO_GRAPHQL_URL = "https://api.morpho.org/graphql"
 
 CHAIN_ID_MAP: dict[str, int] = {
     "ethereum": 1,
     "base": 8453,
-}
-
-MORPHO_BLUE_ADDRESSES: dict[str, str] = {
-    "ethereum": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
-    "base": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
 }
 
 MORPHO_EVENT_TOPIC0S: list[str] = [
@@ -224,8 +217,6 @@ def _parse_topics(raw: Any) -> list[str]:
     if isinstance(raw, str):
         stripped = raw.strip()
         if stripped.startswith("["):
-            import json
-
             try:
                 return json.loads(stripped)
             except (json.JSONDecodeError, TypeError):
